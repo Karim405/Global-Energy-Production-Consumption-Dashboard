@@ -11,7 +11,7 @@ over decades. The goal is to build a dashboard that visualizes the world's energ
 and the progress toward clean energy.
 
 ## Dataset
-• Name: Our World in Data — Energy Dataset
-• Source: https://github.com/owid/energydata or https://www.kaggle.com/datasets/pralabhpoudel/world-energyconsumption
-• File: World Energy Consumption.csv
-• Size: ~16,000 rows | 120+ columns
+> • Name: Our World in Data — Energy Dataset
+> • Source: https://github.com/owid/energydata or https://www.kaggle.com/datasets/pralabhpoudel/world-energyconsumption
+> • File: World Energy Consumption.csv
+> • Size: ~16,000 rows | 120+ columns
