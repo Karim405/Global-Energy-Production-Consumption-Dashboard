@@ -12,6 +12,9 @@ and the progress toward clean energy.
 
 ## Dataset
 > • Name: Our World in Data — Energy Dataset
+
 > • Source: https://github.com/owid/energydata or https://www.kaggle.com/datasets/pralabhpoudel/world-energyconsumption
+
 > • File: World Energy Consumption.csv
+
 > • Size: ~16,000 rows | 120+ columns
