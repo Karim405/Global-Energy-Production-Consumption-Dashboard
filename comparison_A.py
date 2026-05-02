@@ -181,3 +181,4 @@ if __name__ == "__main__":
 
     assert sum(len(trace.x) for trace in fig.data) == 10
     print("OK ✓")
+    ##
