@@ -358,6 +358,14 @@ def function_chart3(df):
     Stacked Bar Chart:
     Energy Mix Composition for Selected Countries
     Coal + Oil + Gas + Renewables
+
+    Features:
+    - Regular stacked bar chart (not 100%)
+    - Values shown inside each segment
+    - Total shown at the end of each bar
+    - Highest total country/countries highlighted in green shades
+    - Legend inside the chart
+    - HTotal used instead of Highest Total
     """
 
     import pandas as pd
@@ -365,6 +373,7 @@ def function_chart3(df):
 
     df_latest, latest_year = _prepare_latest_real_countries(df)
 
+    # Convert columns to numeric
     df_latest["coal"] = pd.to_numeric(
         df_latest["coal_production"], errors="coerce"
     ).fillna(0)
@@ -381,6 +390,7 @@ def function_chart3(df):
         df_latest["renewables_electricity"], errors="coerce"
     ).fillna(0)
 
+    # Calculate total energy
     df_latest["total"] = (
         df_latest["coal"]
         + df_latest["oil"]
@@ -388,6 +398,7 @@ def function_chart3(df):
         + df_latest["renewables"]
     )
 
+    # Select top 5 countries by total energy
     top = (
         df_latest[df_latest["total"] > 0]
         .sort_values("total", ascending=False)
@@ -396,74 +407,125 @@ def function_chart3(df):
     )
 
     top = _shorten_country_names(top)
+
+    # Sort ascending so the largest appears at the top in horizontal chart
     top = top.sort_values("total", ascending=True)
-
-    fig = go.Figure()
-
-    fig.add_bar(
-        y=top["country"],
-        x=top["coal"],
-        name="Coal",
-        orientation="h",
-        marker_color="#C7DCEB",
-        marker_line=dict(color="white", width=1),
-        text=top["coal"].round(0),
-        texttemplate="%{text:.0f}",
-        textposition="inside",
-        textfont=dict(color="black", size=11),
-        hovertemplate="<b>%{y}</b><br>Coal: %{x:.2f}<extra></extra>"
-    )
-
-    fig.add_bar(
-        y=top["country"],
-        x=top["oil"],
-        name="Oil",
-        orientation="h",
-        marker_color="#9FC4DB",
-        marker_line=dict(color="white", width=1),
-        text=top["oil"].round(0),
-        texttemplate="%{text:.0f}",
-        textposition="inside",
-        textfont=dict(color="black", size=11),
-        hovertemplate="<b>%{y}</b><br>Oil: %{x:.2f}<extra></extra>"
-    )
-
-    fig.add_bar(
-        y=top["country"],
-        x=top["gas"],
-        name="Gas",
-        orientation="h",
-        marker_color="#5DADE2",
-        marker_line=dict(color="white", width=1),
-        text=top["gas"].round(0),
-        texttemplate="%{text:.0f}",
-        textposition="inside",
-        textfont=dict(color="black", size=11),
-        hovertemplate="<b>%{y}</b><br>Gas: %{x:.2f}<extra></extra>"
-    )
-
-    fig.add_bar(
-        y=top["country"],
-        x=top["renewables"],
-        name="Renewables",
-        orientation="h",
-        marker_color="#7DDA7A",
-        marker_line=dict(color="white", width=1),
-        text=top["renewables"].round(0),
-        texttemplate="%{text:.0f}",
-        textposition="inside",
-        textfont=dict(color="black", size=11),
-        hovertemplate="<b>%{y}</b><br>Renewables: %{x:.2f}<extra></extra>"
-    )
 
     max_total = top["total"].max()
 
+    # Mark highest total country/countries
+    # لو فيه تعادل في أعلى قيمة، كلهم هيتعلموا كـ Highest
+    top["is_highest"] = top["total"] == max_total
+
+    # Standard colors: blue shades
+    standard_colors = {
+        "coal": "#C7DCEB",
+        "oil": "#9FC4DB",
+        "gas": "#5DADE2",
+        "renewables": "#A8D8F0"
+    }
+
+    # Highest colors: green shades
+    highest_colors = {
+        "coal": "#DDF5DB",
+        "oil": "#BFEAB9",
+        "gas": "#90DD86",
+        "renewables": "#6FD36B"
+    }
+
+    fig = go.Figure()
+
+    def add_segment_pair(column_name, display_name):
+        """
+        Add two traces for each energy source:
+        1. Standard trace
+        2. Highest trace
+
+        This makes the legend show both Standard and Highest colors.
+        """
+
+        # Values for standard countries only
+        standard_x = [
+            value if not is_highest else 0
+            for value, is_highest in zip(top[column_name], top["is_highest"])
+        ]
+
+        standard_text = [
+            f"{value:.0f}" if (not is_highest and value > 0) else ""
+            for value, is_highest in zip(top[column_name], top["is_highest"])
+        ]
+
+        # Values for highest countries only
+        highest_x = [
+            value if is_highest else 0
+            for value, is_highest in zip(top[column_name], top["is_highest"])
+        ]
+
+        highest_text = [
+            f"{value:.0f}" if (is_highest and value > 0) else ""
+            for value, is_highest in zip(top[column_name], top["is_highest"])
+        ]
+
+        # Standard trace
+        fig.add_bar(
+            y=top["country"],
+            x=standard_x,
+            name=f"{display_name} (Standard)",
+            orientation="h",
+            marker_color=standard_colors[column_name],
+            marker_line=dict(color="white", width=1),
+            text=standard_text,
+            texttemplate="%{text}",
+            textposition="inside",
+            insidetextanchor="middle",
+            textfont=dict(color="black", size=12, family="Arial Black"),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                + f"{display_name}: "
+                + "%{x:.2f}<extra></extra>"
+            )
+        )
+
+        # Highest trace
+        fig.add_bar(
+            y=top["country"],
+            x=highest_x,
+            name=f"{display_name} (Highest)",
+            orientation="h",
+            marker_color=highest_colors[column_name],
+            marker_line=dict(color="white", width=1),
+            text=highest_text,
+            texttemplate="%{text}",
+            textposition="inside",
+            insidetextanchor="middle",
+            textfont=dict(color="black", size=12, family="Arial Black"),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                + f"{display_name}: "
+                + "%{x:.2f}<extra></extra>"
+            )
+        )
+
+    # Add segments in stacked order
+    add_segment_pair("coal", "Coal")
+    add_segment_pair("oil", "Oil")
+    add_segment_pair("gas", "Gas")
+    add_segment_pair("renewables", "Renewables")
+
+    # Add Total / HTotal annotation after each bar
     for _, row in top.iterrows():
+        if row["is_highest"]:
+            label = f"<b>HTotal: {row['total']:.0f}</b>"
+        else:
+            label = f"<b>Total: {row['total']:.0f}</b>"
+
         fig.add_annotation(
-            x=row["total"] + max_total * 0.02,
+            x=row["total"] + max_total * 0.008,
             y=row["country"],
-            text=f"Total: {row['total']:.0f}",
+            text=label,
             showarrow=False,
+            xanchor="left",
+            yanchor="middle",
             font=dict(size=12, color="black")
         )
 
@@ -479,18 +541,26 @@ def function_chart3(df):
         barmode="stack",
         template="plotly_white",
         font=dict(color="black"),
+        showlegend=True,
+
+        # Legend inside the chart, like a small table
         legend=dict(
             title="Energy Source",
-            traceorder="normal",
             x=0.98,
             y=0.98,
             xanchor="right",
             yanchor="top",
-            bgcolor="white",
+            bgcolor="rgba(255,255,255,0.9)",
             bordercolor="black",
-            borderwidth=1
+            borderwidth=1,
+            font=dict(size=10),
+            title_font=dict(size=11),
+            itemwidth=30
         ),
-        margin=dict(l=120, r=160, t=90, b=70),
+
+        # Legend is inside, so right margin does not need to be huge
+        margin=dict(l=120, r=120, t=90, b=70),
+
         shapes=[
             dict(
                 type="rect",
@@ -506,15 +576,20 @@ def function_chart3(df):
     )
 
     fig.update_xaxes(
+        title_text="Total Energy",
         gridcolor="lightgray",
         rangemode="tozero",
-        range=[0, max_total * 1.2]
+
+        # Extra room for Total / HTotal labels and inside legend
+        range=[0, max_total * 1.45]
     )
 
-    fig.update_yaxes(showgrid=False)
+    fig.update_yaxes(
+        title_text="Country",
+        showgrid=False
+    )
 
     return fig
-
 ##testchart3
 
 if __name__ == "__main__":
