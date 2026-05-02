@@ -56,7 +56,7 @@ def _shorten_country_names(df):
     df = df.copy()
     df["country"] = df["country"].replace(name_map)
     return df
-
+##chart1
 
 def function_chart1(df):
     """
@@ -171,7 +171,25 @@ def function_chart1(df):
     )
 
     return fig
+##testchart1
+if __name__ == "__main__":
+    import pandas as pd
 
+    # اقرأ الداتا
+    df = pd.read_csv(DATA_PATH)
+
+    print("Testing function_chart1() ...")
+
+    # استدعاء الشارت
+    fig1 = function_chart1(df)
+
+    print("Chart 1 OK ✓")
+
+    # عرض الشارت
+    fig1.show()
+
+
+##chart2
 
 def function_chart2(df):
     """
@@ -312,6 +330,8 @@ def function_chart2(df):
 
     return fig
 
+##testchart2
+
 
 if __name__ == "__main__":
     df = pd.read_csv(DATA_PATH)
@@ -329,3 +349,179 @@ if __name__ == "__main__":
     print("Chart 2 OK ✓")
 
     fig2.show()
+
+##chart3
+import pandas as pd
+import plotly.graph_objects as go
+def function_chart3(df):
+    """
+    Stacked Bar Chart:
+    Energy Mix Composition for Selected Countries
+    Coal + Oil + Gas + Renewables
+    """
+
+    import pandas as pd
+    import plotly.graph_objects as go
+
+    df_latest, latest_year = _prepare_latest_real_countries(df)
+
+    df_latest["coal"] = pd.to_numeric(
+        df_latest["coal_production"], errors="coerce"
+    ).fillna(0)
+
+    df_latest["oil"] = pd.to_numeric(
+        df_latest["oil_production"], errors="coerce"
+    ).fillna(0)
+
+    df_latest["gas"] = pd.to_numeric(
+        df_latest["gas_production"], errors="coerce"
+    ).fillna(0)
+
+    df_latest["renewables"] = pd.to_numeric(
+        df_latest["renewables_electricity"], errors="coerce"
+    ).fillna(0)
+
+    df_latest["total"] = (
+        df_latest["coal"]
+        + df_latest["oil"]
+        + df_latest["gas"]
+        + df_latest["renewables"]
+    )
+
+    top = (
+        df_latest[df_latest["total"] > 0]
+        .sort_values("total", ascending=False)
+        .head(5)
+        .copy()
+    )
+
+    top = _shorten_country_names(top)
+    top = top.sort_values("total", ascending=True)
+
+    fig = go.Figure()
+
+    fig.add_bar(
+        y=top["country"],
+        x=top["coal"],
+        name="Coal",
+        orientation="h",
+        marker_color="#C7DCEB",
+        marker_line=dict(color="white", width=1),
+        text=top["coal"].round(0),
+        texttemplate="%{text:.0f}",
+        textposition="inside",
+        textfont=dict(color="black", size=11),
+        hovertemplate="<b>%{y}</b><br>Coal: %{x:.2f}<extra></extra>"
+    )
+
+    fig.add_bar(
+        y=top["country"],
+        x=top["oil"],
+        name="Oil",
+        orientation="h",
+        marker_color="#9FC4DB",
+        marker_line=dict(color="white", width=1),
+        text=top["oil"].round(0),
+        texttemplate="%{text:.0f}",
+        textposition="inside",
+        textfont=dict(color="black", size=11),
+        hovertemplate="<b>%{y}</b><br>Oil: %{x:.2f}<extra></extra>"
+    )
+
+    fig.add_bar(
+        y=top["country"],
+        x=top["gas"],
+        name="Gas",
+        orientation="h",
+        marker_color="#5DADE2",
+        marker_line=dict(color="white", width=1),
+        text=top["gas"].round(0),
+        texttemplate="%{text:.0f}",
+        textposition="inside",
+        textfont=dict(color="black", size=11),
+        hovertemplate="<b>%{y}</b><br>Gas: %{x:.2f}<extra></extra>"
+    )
+
+    fig.add_bar(
+        y=top["country"],
+        x=top["renewables"],
+        name="Renewables",
+        orientation="h",
+        marker_color="#7DDA7A",
+        marker_line=dict(color="white", width=1),
+        text=top["renewables"].round(0),
+        texttemplate="%{text:.0f}",
+        textposition="inside",
+        textfont=dict(color="black", size=11),
+        hovertemplate="<b>%{y}</b><br>Renewables: %{x:.2f}<extra></extra>"
+    )
+
+    max_total = top["total"].max()
+
+    for _, row in top.iterrows():
+        fig.add_annotation(
+            x=row["total"] + max_total * 0.02,
+            y=row["country"],
+            text=f"Total: {row['total']:.0f}",
+            showarrow=False,
+            font=dict(size=12, color="black")
+        )
+
+    fig.update_layout(
+        title={
+            "text": f"Energy Mix Composition for Selected Countries ({latest_year})",
+            "x": 0.5,
+            "xanchor": "center",
+            "font": dict(size=18, color="black")
+        },
+        xaxis_title="Total Energy",
+        yaxis_title="Country",
+        barmode="stack",
+        template="plotly_white",
+        font=dict(color="black"),
+        legend=dict(
+            title="Energy Source",
+            traceorder="normal",
+            x=0.98,
+            y=0.98,
+            xanchor="right",
+            yanchor="top",
+            bgcolor="white",
+            bordercolor="black",
+            borderwidth=1
+        ),
+        margin=dict(l=120, r=160, t=90, b=70),
+        shapes=[
+            dict(
+                type="rect",
+                xref="paper",
+                yref="paper",
+                x0=0,
+                y0=0,
+                x1=1,
+                y1=1,
+                line=dict(color="black", width=2)
+            )
+        ]
+    )
+
+    fig.update_xaxes(
+        gridcolor="lightgray",
+        rangemode="tozero",
+        range=[0, max_total * 1.2]
+    )
+
+    fig.update_yaxes(showgrid=False)
+
+    return fig
+
+##testchart3
+
+if __name__ == "__main__":
+    df = pd.read_csv(DATA_PATH)
+
+    print("Testing function_chart3() ...")
+    fig = function_chart3(df)
+    print("Chart 3 OK ✓")
+
+    fig.show()
