@@ -1,11 +1,17 @@
 import pandas as pd
 import plotly.express as px
 
+try:
+    from shared_ids import DATA_PATH
+except ImportError:
+    DATA_PATH = "data/cleaned_data.csv"
+
 
 def function_chart1(df):
     """
     Column Chart:
     Top 10 Countries by Total Energy Consumption.
+    Returns a Plotly figure only.
     """
 
     df = df.copy()
@@ -59,20 +65,17 @@ def function_chart1(df):
         .copy()
     )
 
-    # Summarize long labels
     name_map = {
         "United States": "USA",
         "South Korea": "S. Korea"
     }
     top_10["country"] = top_10["country"].replace(name_map)
 
-    # Winner must be on the far left
     top_10 = top_10.sort_values("primary_energy_consumption", ascending=False)
 
     top_color = "lightgreen"
     other_color = "lightblue"
 
-    # Base figure
     fig = px.bar(
         top_10,
         x="country",
@@ -84,10 +87,8 @@ def function_chart1(df):
         }
     )
 
-    # Replace base trace with two clean legend traces
     fig.data = []
 
-    # Maximum performer
     fig.add_bar(
         x=[top_10.iloc[0]["country"]],
         y=[top_10.iloc[0]["primary_energy_consumption"]],
@@ -99,7 +100,6 @@ def function_chart1(df):
         hovertemplate="<b>%{x}</b><br>Energy Consumption: %{y:,.2f} TWh<extra></extra>"
     )
 
-    # Standard performers
     fig.add_bar(
         x=top_10.iloc[1:]["country"],
         y=top_10.iloc[1:]["primary_energy_consumption"],
@@ -133,11 +133,7 @@ def function_chart1(df):
         ),
         margin=dict(l=50, r=50, t=90, b=80),
         uniformtext_minsize=8,
-        uniformtext_mode="hide"
-    )
-
-    # Black chart border
-    fig.update_layout(
+        uniformtext_mode="hide",
         shapes=[
             dict(
                 type="rect",
@@ -168,7 +164,7 @@ def function_chart1(df):
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("data/cleaned_data.csv")
+    df = pd.read_csv(DATA_PATH)
 
     print("Testing function_chart1() ...")
     fig = function_chart1(df)
@@ -181,4 +177,3 @@ if __name__ == "__main__":
 
     assert sum(len(trace.x) for trace in fig.data) == 10
     print("OK ✓")
-    
