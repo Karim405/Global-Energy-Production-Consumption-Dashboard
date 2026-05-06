@@ -3,84 +3,216 @@ time_filters.py
 ---------------
 Person 4 — Time Series Module + Interactive Filters
 Global Energy Production & Consumption Dashboard
-
-Contains:
-    - function_line()   : Line Chart  — Global Renewable Energy Trend Over Years
-    - function_area()   : Area Chart  — Fossil Fuel vs Renewable Transition Over Time
-    - create_filters_layout() : All interactive controls (dropdowns, sliders, etc.)
-
-Filter component IDs (share with Person 5 for callbacks):
-    - "country-dropdown"    : Multi-select country dropdown
-    - "continent-checklist" : Continent multi-checklist
-    - "year-slider"         : Year range slider  (returns [start, end])
-    - "energy-source-radio" : Radio items for energy source selection
 """
 
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from dash import dcc, html
 
-# ─────────────────────────────────────────────
-# DATA HELPERS  (used internally by this module)
-# ─────────────────────────────────────────────
+try:
+    from shared_ids import Filters
+except ImportError:
+    class Filters:
+        COUNTRY_DROPDOWN = "country-dropdown"
+        CONTINENT_CHECKLIST = "continent-checklist"
+        YEAR_SLIDER = "year-slider"
+        ENERGY_SOURCE_RADIO = "energy-source-radio"
+        RESET_BTN = "reset-filters-btn"
+
+
+def _clean_column_names(df):
+    df = df.copy()
+
+    df.columns = (
+        df.columns
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_", regex=False)
+        .str.replace("-", "_", regex=False)
+        .str.replace("__", "_", regex=False)
+    )
+
+    return df
+
 
 def _load_data(filepath="data/cleaned_data.csv"):
-    """Load and prepare the dataset."""
     df = pd.read_csv(filepath)
-    df["year"] = pd.to_datetime(df["year"]).dt.year
+    df = _clean_column_names(df)
+
+    possible_country_cols = [
+        "country",
+        "entity",
+        "location",
+        "name",
+        "countries",
+        "country_name",
+    ]
+
+    found_country_col = None
+
+    for col in possible_country_cols:
+        if col in df.columns:
+            found_country_col = col
+            break
+
+    if found_country_col is None:
+        print("\nAVAILABLE COLUMNS IN DATASET:")
+        print(df.columns.tolist())
+        raise KeyError("No country column found.")
+
+    if found_country_col != "country":
+        df = df.rename(columns={found_country_col: "country"})
+
+    possible_year_cols = ["year", "date", "time"]
+
+    found_year_col = None
+
+    for col in possible_year_cols:
+        if col in df.columns:
+            found_year_col = col
+            break
+
+    if found_year_col is None:
+        print("\nAVAILABLE COLUMNS IN DATASET:")
+        print(df.columns.tolist())
+        raise KeyError("No year column found.")
+
+    if found_year_col != "year":
+        df = df.rename(columns={found_year_col: "year"})
+
+    year_text = df["year"].astype(str)
+    extracted_year = year_text.str.extract(r"(\d{4})", expand=False)
+
+    df["year"] = pd.to_numeric(extracted_year, errors="coerce")
+
+    if df["year"].dropna().empty:
+        print("\nYEAR COLUMN SAMPLE VALUES:")
+        print(year_text.head(20).tolist())
+        raise ValueError("Could not extract valid years.")
+
+    df = df.dropna(subset=["year"])
+    df["year"] = df["year"].astype(int)
+
     return df
 
 
 def _get_global_trend(df):
-    """
-    Aggregate individual countries per year to get a global trend.
-    Excludes regional aggregates (Ember, EI, Shift, etc.) to avoid double-counting.
-    """
-    exclude = ["Ember", "(EI)", "(Shift)", "(BP)", "(EIA)", "OECD",
-               "income", "G20", "ASEAN", "World", "Africa", "Asia",
-               "Europe", "North America", "South America", "Oceania"]
-    mask = df["country"].apply(
-        lambda c: not any(kw.lower() in c.lower() for kw in exclude)
+    df = df.copy()
+
+    exclude = [
+        "Ember",
+        "(EI)",
+        "(Shift)",
+        "(BP)",
+        "(EIA)",
+        "OECD",
+        "income",
+        "G20",
+        "ASEAN",
+        "World",
+        "Africa",
+        "Asia",
+        "Europe",
+        "North America",
+        "South America",
+        "Oceania",
+    ]
+
+    mask = df["country"].astype(str).apply(
+        lambda country: not any(
+            keyword.lower() in country.lower()
+            for keyword in exclude
+        )
     )
-    individual = df[mask]
+
+    individual = df[mask].copy()
+
     cols = [
-        "renewables_electricity", "solar_electricity", "wind_electricity",
-        "hydro_electricity", "nuclear_electricity", "low_carbon_electricity",
-        "coal_production", "gas_production", "oil_production",
+        "renewables_electricity",
+        "solar_electricity",
+        "wind_electricity",
+        "hydro_electricity",
+        "nuclear_electricity",
+        "low_carbon_electricity",
+        "coal_production",
+        "gas_production",
+        "oil_production",
         "primary_energy_consumption",
     ]
+
+    for col in cols:
+        if col not in individual.columns:
+            individual[col] = 0
+
+        individual[col] = pd.to_numeric(
+            individual[col],
+            errors="coerce"
+        ).fillna(0)
+
     trend = individual.groupby("year")[cols].sum().reset_index()
     return trend
 
 
 def _get_individual_countries(df):
-    """Return list of individual (non-aggregate) countries."""
-    exclude = ["Ember", "(EI)", "(Shift)", "(BP)", "(EIA)", "OECD",
-               "income", "G20", "ASEAN", "World", "Africa", "Asia",
-               "Europe", "North America", "South America", "Oceania"]
-    mask = df["country"].apply(
-        lambda c: not any(kw.lower() in c.lower() for kw in exclude)
+    df = df.copy()
+
+    exclude = [
+        "Ember",
+        "(EI)",
+        "(Shift)",
+        "(BP)",
+        "(EIA)",
+        "OECD",
+        "income",
+        "G20",
+        "ASEAN",
+        "World",
+        "Africa",
+        "Asia",
+        "Europe",
+        "North America",
+        "South America",
+        "Oceania",
+    ]
+
+    mask = df["country"].astype(str).apply(
+        lambda country: not any(
+            keyword.lower() in country.lower()
+            for keyword in exclude
+        )
     )
-    return sorted(df[mask]["country"].unique().tolist())
+
+    countries = sorted(
+        df.loc[mask, "country"]
+        .dropna()
+        .astype(str)
+        .unique()
+        .tolist()
+    )
+
+    return countries
 
 
-# Color palette — consistent across the dashboard
 COLORS = {
-    "renewables": "#1D9E75",   # teal-400
-    "solar":      "#EF9F27",   # amber-400
-    "wind":       "#378ADD",   # blue-400
-    "hydro":      "#534AB7",   # purple-400
-    "nuclear":    "#D4537E",   # pink-400
-    "coal":       "#888780",   # gray-400
-    "gas":        "#D85A30",   # coral-400
-    "oil":        "#2C2C2A",   # gray-900
+    "renewables": "#1D9E75",
+    "solar": "#EF9F27",
+    "wind": "#378ADD",
+    "hydro": "#534AB7",
+    "nuclear": "#D4537E",
+    "coal": "#888780",
+    "gas": "#D85A30",
+    "oil": "#2C2C2A",
 }
 
 LAYOUT_DEFAULTS = dict(
     plot_bgcolor="white",
     paper_bgcolor="white",
-    font=dict(family="Arial, sans-serif", size=13, color="#2C2C2A"),
+    font=dict(
+        family="Arial, sans-serif",
+        size=13,
+        color="#2C2C2A",
+    ),
     legend=dict(
         orientation="h",
         yanchor="bottom",
@@ -96,102 +228,109 @@ LAYOUT_DEFAULTS = dict(
 )
 
 
-# ─────────────────────────────────────────────
-# CHART 1 — LINE CHART
-# Global Renewable Energy Trend Over Years
-# ─────────────────────────────────────────────
-
 def function_line(filepath="data/cleaned_data.csv", year_range=None, selected_countries=None):
-    """
-    Line Chart: Global Renewable Energy Trend Over Years.
-
-    Shows the growth of different renewable energy sources (solar, wind, hydro,
-    total renewables) from 1990 to 2022 at the global level.
-
-    If selected_countries is provided, aggregates only those countries.
-    year_range: [start_year, end_year] — filters the x-axis range.
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
     df = _load_data(filepath)
     trend = _get_global_trend(df)
 
-    # Apply year filter
     if year_range:
-        trend = trend[(trend["year"] >= year_range[0]) & (trend["year"] <= year_range[1])]
+        trend = trend[
+            (trend["year"] >= int(year_range[0]))
+            & (trend["year"] <= int(year_range[1]))
+        ]
     else:
         trend = trend[trend["year"] >= 1990]
 
-    # If specific countries are selected, re-aggregate only those
     if selected_countries and len(selected_countries) > 0:
-        country_df = df[df["country"].isin(selected_countries)]
+        country_df = df[df["country"].isin(selected_countries)].copy()
+
         if year_range:
             country_df = country_df[
-                (country_df["year"] >= year_range[0]) &
-                (country_df["year"] <= year_range[1])
+                (country_df["year"] >= int(year_range[0]))
+                & (country_df["year"] <= int(year_range[1]))
             ]
         else:
             country_df = country_df[country_df["year"] >= 1990]
-        cols = ["renewables_electricity", "solar_electricity",
-                "wind_electricity", "hydro_electricity", "nuclear_electricity"]
+
+        cols = [
+            "renewables_electricity",
+            "solar_electricity",
+            "wind_electricity",
+            "hydro_electricity",
+            "nuclear_electricity",
+        ]
+
+        for col in cols:
+            if col not in country_df.columns:
+                country_df[col] = 0
+
+            country_df[col] = pd.to_numeric(
+                country_df[col],
+                errors="coerce"
+            ).fillna(0)
+
         trend = country_df.groupby("year")[cols].sum().reset_index()
 
     fig = go.Figure()
 
-    # Total Renewables — thick main line
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["renewables_electricity"].round(2),
-        name="Total Renewables",
-        mode="lines",
-        line=dict(color=COLORS["renewables"], width=3),
-        hovertemplate="%{y:.1f} TWh<extra>Total Renewables</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["renewables_electricity"].round(2),
+            name="Total Renewables",
+            mode="lines",
+            line=dict(color=COLORS["renewables"], width=3),
+            hovertemplate="%{y:.1f} TWh<extra>Total Renewables</extra>",
+        )
+    )
 
-    # Solar
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["solar_electricity"].round(2),
-        name="Solar",
-        mode="lines",
-        line=dict(color=COLORS["solar"], width=2, dash="dot"),
-        hovertemplate="%{y:.1f} TWh<extra>Solar</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["solar_electricity"].round(2),
+            name="Solar",
+            mode="lines",
+            line=dict(color=COLORS["solar"], width=2, dash="dot"),
+            hovertemplate="%{y:.1f} TWh<extra>Solar</extra>",
+        )
+    )
 
-    # Wind
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["wind_electricity"].round(2),
-        name="Wind",
-        mode="lines",
-        line=dict(color=COLORS["wind"], width=2, dash="dash"),
-        hovertemplate="%{y:.1f} TWh<extra>Wind</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["wind_electricity"].round(2),
+            name="Wind",
+            mode="lines",
+            line=dict(color=COLORS["wind"], width=2, dash="dash"),
+            hovertemplate="%{y:.1f} TWh<extra>Wind</extra>",
+        )
+    )
 
-    # Hydro
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["hydro_electricity"].round(2),
-        name="Hydro",
-        mode="lines",
-        line=dict(color=COLORS["hydro"], width=2, dash="dashdot"),
-        hovertemplate="%{y:.1f} TWh<extra>Hydro</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["hydro_electricity"].round(2),
+            name="Hydro",
+            mode="lines",
+            line=dict(color=COLORS["hydro"], width=2, dash="dashdot"),
+            hovertemplate="%{y:.1f} TWh<extra>Hydro</extra>",
+        )
+    )
 
-    # Nuclear
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["nuclear_electricity"].round(2),
-        name="Nuclear",
-        mode="lines",
-        line=dict(color=COLORS["nuclear"], width=2, dash="longdash"),
-        hovertemplate="%{y:.1f} TWh<extra>Nuclear</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["nuclear_electricity"].round(2),
+            name="Nuclear",
+            mode="lines",
+            line=dict(color=COLORS["nuclear"], width=2, dash="longdash"),
+            hovertemplate="%{y:.1f} TWh<extra>Nuclear</extra>",
+        )
+    )
 
     scope_label = (
         f"Selected Countries ({len(selected_countries)})"
-        if selected_countries else "Global"
+        if selected_countries
+        else "Global"
     )
 
     fig.update_layout(
@@ -219,109 +358,119 @@ def function_line(filepath="data/cleaned_data.csv", year_range=None, selected_co
     return fig
 
 
-# ─────────────────────────────────────────────
-# CHART 2 — AREA CHART
-# Fossil Fuel to Renewable Transition Over Time
-# ─────────────────────────────────────────────
-
 def function_area(filepath="data/cleaned_data.csv", year_range=None, selected_countries=None):
-    """
-    Area Chart: Fossil Fuel vs Renewable Transition Over Time.
-
-    Stacked area chart showing the composition of energy production over time —
-    coal, oil, gas vs renewables + nuclear — visualising the energy transition.
-
-    year_range: [start_year, end_year]
-    selected_countries: list of country names to filter (optional)
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
     df = _load_data(filepath)
     trend = _get_global_trend(df)
 
-    # Apply year filter
     if year_range:
-        trend = trend[(trend["year"] >= year_range[0]) & (trend["year"] <= year_range[1])]
+        trend = trend[
+            (trend["year"] >= int(year_range[0]))
+            & (trend["year"] <= int(year_range[1]))
+        ]
     else:
         trend = trend[trend["year"] >= 1990]
 
-    # If specific countries selected, re-aggregate
     if selected_countries and len(selected_countries) > 0:
-        country_df = df[df["country"].isin(selected_countries)]
+        country_df = df[df["country"].isin(selected_countries)].copy()
+
         if year_range:
             country_df = country_df[
-                (country_df["year"] >= year_range[0]) &
-                (country_df["year"] <= year_range[1])
+                (country_df["year"] >= int(year_range[0]))
+                & (country_df["year"] <= int(year_range[1]))
             ]
         else:
             country_df = country_df[country_df["year"] >= 1990]
-        cols = ["coal_production", "oil_production", "gas_production",
-                "renewables_electricity", "nuclear_electricity"]
+
+        cols = [
+            "coal_production",
+            "oil_production",
+            "gas_production",
+            "renewables_electricity",
+            "nuclear_electricity",
+        ]
+
+        for col in cols:
+            if col not in country_df.columns:
+                country_df[col] = 0
+
+            country_df[col] = pd.to_numeric(
+                country_df[col],
+                errors="coerce"
+            ).fillna(0)
+
         trend = country_df.groupby("year")[cols].sum().reset_index()
 
     fig = go.Figure()
 
-    # Fossil fuels — stacked below (warm colors)
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["coal_production"].round(2),
-        name="Coal",
-        mode="lines",
-        stackgroup="one",
-        fillcolor="rgba(136, 135, 128, 0.7)",   # gray
-        line=dict(color=COLORS["coal"], width=0.5),
-        hovertemplate="%{y:.1f} TWh<extra>Coal</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["coal_production"].round(2),
+            name="Coal",
+            mode="lines",
+            stackgroup="one",
+            fillcolor="rgba(136, 135, 128, 0.7)",
+            line=dict(color=COLORS["coal"], width=0.5),
+            hovertemplate="%{y:.1f} TWh<extra>Coal</extra>",
+        )
+    )
 
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["oil_production"].round(2),
-        name="Oil",
-        mode="lines",
-        stackgroup="one",
-        fillcolor="rgba(44, 44, 42, 0.65)",     # dark gray
-        line=dict(color=COLORS["oil"], width=0.5),
-        hovertemplate="%{y:.1f} TWh<extra>Oil</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["oil_production"].round(2),
+            name="Oil",
+            mode="lines",
+            stackgroup="one",
+            fillcolor="rgba(44, 44, 42, 0.65)",
+            line=dict(color=COLORS["oil"], width=0.5),
+            hovertemplate="%{y:.1f} TWh<extra>Oil</extra>",
+        )
+    )
 
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["gas_production"].round(2),
-        name="Gas",
-        mode="lines",
-        stackgroup="one",
-        fillcolor="rgba(216, 90, 48, 0.65)",    # coral
-        line=dict(color=COLORS["gas"], width=0.5),
-        hovertemplate="%{y:.1f} TWh<extra>Gas</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["gas_production"].round(2),
+            name="Gas",
+            mode="lines",
+            stackgroup="one",
+            fillcolor="rgba(216, 90, 48, 0.65)",
+            line=dict(color=COLORS["gas"], width=0.5),
+            hovertemplate="%{y:.1f} TWh<extra>Gas</extra>",
+        )
+    )
 
-    # Clean energy — stacked on top (green / teal)
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["renewables_electricity"].round(2),
-        name="Renewables",
-        mode="lines",
-        stackgroup="one",
-        fillcolor="rgba(29, 158, 117, 0.7)",    # teal
-        line=dict(color=COLORS["renewables"], width=0.5),
-        hovertemplate="%{y:.1f} TWh<extra>Renewables</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["renewables_electricity"].round(2),
+            name="Renewables",
+            mode="lines",
+            stackgroup="one",
+            fillcolor="rgba(29, 158, 117, 0.7)",
+            line=dict(color=COLORS["renewables"], width=0.5),
+            hovertemplate="%{y:.1f} TWh<extra>Renewables</extra>",
+        )
+    )
 
-    fig.add_trace(go.Scatter(
-        x=trend["year"],
-        y=trend["nuclear_electricity"].round(2),
-        name="Nuclear",
-        mode="lines",
-        stackgroup="one",
-        fillcolor="rgba(212, 83, 126, 0.65)",   # pink
-        line=dict(color=COLORS["nuclear"], width=0.5),
-        hovertemplate="%{y:.1f} TWh<extra>Nuclear</extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=trend["year"],
+            y=trend["nuclear_electricity"].round(2),
+            name="Nuclear",
+            mode="lines",
+            stackgroup="one",
+            fillcolor="rgba(212, 83, 126, 0.65)",
+            line=dict(color=COLORS["nuclear"], width=0.5),
+            hovertemplate="%{y:.1f} TWh<extra>Nuclear</extra>",
+        )
+    )
 
     scope_label = (
         f"Selected Countries ({len(selected_countries)})"
-        if selected_countries else "Global"
+        if selected_countries
+        else "Global"
     )
 
     fig.update_layout(
@@ -349,69 +498,86 @@ def function_area(filepath="data/cleaned_data.csv", year_range=None, selected_co
     return fig
 
 
-# ─────────────────────────────────────────────
-# FILTERS LAYOUT
-# create_filters_layout()
-# ─────────────────────────────────────────────
-
 def create_filters_layout(filepath="data/cleaned_data.csv"):
-    """
-    Creates the full interactive filters panel for the dashboard.
-
-    Filter IDs (must match callbacks in callbacks.py — share with Person 5):
-        "country-dropdown"    : dcc.Dropdown  (multi=True)
-        "continent-checklist" : dcc.Checklist
-        "year-slider"         : dcc.RangeSlider  → value = [start_year, end_year]
-        "energy-source-radio" : dcc.RadioItems
-
-    Returns:
-        dash.html.Div  — the complete filters panel
-    """
     df = _load_data(filepath)
+
     countries = _get_individual_countries(df)
-    years = sorted(df["year"].unique())
-    min_year, max_year = int(min(years)), int(max(years))
+    years = sorted(df["year"].dropna().unique())
 
-    # Build slider marks (every 10 years + endpoints)
+    if len(years) == 0:
+        raise ValueError("No valid years found after loading the dataset.")
+
+    min_year = int(min(years))
+    max_year = int(max(years))
+
+    default_start_year = 1990 if min_year <= 1990 <= max_year else min_year
+
+    continents = [
+        "Africa",
+        "Asia",
+        "Europe",
+        "North America",
+        "South America",
+        "Oceania",
+    ]
+
+    energy_sources = [
+        {"label": "🌿 Renewables", "value": "renewables_electricity"},
+        {"label": "☀️ Solar", "value": "solar_electricity"},
+        {"label": "💨 Wind", "value": "wind_electricity"},
+        {"label": "💧 Hydro", "value": "hydro_electricity"},
+        {"label": "☢️ Nuclear", "value": "nuclear_electricity"},
+        {"label": "🪨 Coal", "value": "coal_production"},
+        {"label": "🔥 Gas", "value": "gas_production"},
+        {"label": "🛢️ Oil", "value": "oil_production"},
+        {"label": "⚡ Total Consumption", "value": "primary_energy_consumption"},
+    ]
+
     slider_marks = {
-        yr: {"label": str(yr), "style": {"fontSize": "11px"}}
-        for yr in range(min_year, max_year + 1, 10)
+        min_year: {
+            "label": str(min_year),
+            "style": {
+                "fontSize": "10px",
+                "whiteSpace": "nowrap",
+            },
+        },
+        max_year: {
+            "label": str(max_year),
+            "style": {
+                "fontSize": "10px",
+                "whiteSpace": "nowrap",
+            },
+        },
     }
-    slider_marks[max_year] = {"label": str(max_year), "style": {"fontSize": "11px"}}
 
-    CONTINENTS = [
-        "Africa", "Asia", "Europe",
-        "North America", "South America", "Oceania",
-    ]
+    if min_year <= 1990 <= max_year:
+        slider_marks[1990] = {
+            "label": "1990",
+            "style": {
+                "fontSize": "10px",
+                "whiteSpace": "nowrap",
+            },
+        }
 
-    ENERGY_SOURCES = [
-        {"label": "🌿  Renewables",    "value": "renewables_electricity"},
-        {"label": "☀️  Solar",          "value": "solar_electricity"},
-        {"label": "💨  Wind",           "value": "wind_electricity"},
-        {"label": "💧  Hydro",          "value": "hydro_electricity"},
-        {"label": "⚛️  Nuclear",        "value": "nuclear_electricity"},
-        {"label": "🏭  Coal",           "value": "coal_production"},
-        {"label": "🔥  Gas",            "value": "gas_production"},
-        {"label": "🛢️  Oil",            "value": "oil_production"},
-        {"label": "⚡  Total Consumption", "value": "primary_energy_consumption"},
-    ]
+    slider_marks = dict(sorted(slider_marks.items()))
 
-    # ── Shared label style
     label_style = {
-        "fontSize": "12px",
-        "fontWeight": "500",
+        "display": "block",
+        "fontSize": "13px",
+        "fontWeight": "600",
         "color": "#5F5E5A",
-        "marginBottom": "6px",
+        "marginBottom": "10px",
         "textTransform": "uppercase",
         "letterSpacing": "0.04em",
     }
 
     filter_card_style = {
-        "background": "white",
-        "border": "0.5px solid #D3D1C7",
-        "borderRadius": "10px",
-        "padding": "14px 16px",
-        "marginBottom": "12px",
+        "background": "#FFFFFF",
+        "border": "1px solid #D3D1C7",
+        "borderRadius": "12px",
+        "padding": "16px 18px",
+        "marginBottom": "14px",
+        "boxShadow": "0 1px 3px rgba(0,0,0,0.05)",
     }
 
     layout = html.Div(
@@ -421,137 +587,146 @@ def create_filters_layout(filepath="data/cleaned_data.csv"):
             "fontFamily": "Arial, sans-serif",
         },
         children=[
-
-            # ── Title
             html.H3(
                 "Dashboard Filters",
                 style={
-                    "fontSize": "15px",
-                    "fontWeight": "500",
+                    "fontSize": "16px",
+                    "fontWeight": "600",
                     "color": "#2C2C2A",
                     "marginBottom": "16px",
                     "marginTop": "0",
-                }
+                },
             ),
 
-            # ── 1. Year Range Slider
-            html.Div(style=filter_card_style, children=[
-                html.P("Year Range", style=label_style),
-                dcc.RangeSlider(
-                    id="year-slider",
-                    min=min_year,
-                    max=max_year,
-                    step=1,
-                    value=[1990, max_year],
-                    marks=slider_marks,
-                    tooltip={"placement": "bottom", "always_visible": False},
-                    allowCross=False,
-                ),
-                html.Div(
-                    id="year-slider-output",
-                    style={"fontSize": "12px", "color": "#888780", "marginTop": "8px"},
-                ),
-            ]),
-
-            # ── 2. Country Dropdown (multi)
-            html.Div(style=filter_card_style, children=[
-                html.P("Select Countries", style=label_style),
-                dcc.Dropdown(
-                    id="country-dropdown",
-                    options=[{"label": c, "value": c} for c in countries],
-                    value=[],
-                    multi=True,
-                    placeholder="All countries (global aggregate)",
-                    style={"fontSize": "13px"},
-                    clearable=True,
-                ),
-            ]),
-
-            # ── 3. Continent Checklist
-            html.Div(style=filter_card_style, children=[
-                html.P("Filter by Continent", style=label_style),
-                dcc.Checklist(
-                    id="continent-checklist",
-                    options=[{"label": f"  {c}", "value": c} for c in CONTINENTS],
-                    value=CONTINENTS,          # all selected by default
-                    inline=False,
-                    inputStyle={"marginRight": "6px"},
-                    labelStyle={
-                        "display": "block",
-                        "fontSize": "13px",
-                        "color": "#2C2C2A",
-                        "marginBottom": "4px",
-                        "cursor": "pointer",
-                    },
-                ),
-            ]),
-
-            # ── 4. Energy Source Radio
-            html.Div(style=filter_card_style, children=[
-                html.P("Primary Energy Metric", style=label_style),
-                dcc.RadioItems(
-                    id="energy-source-radio",
-                    options=ENERGY_SOURCES,
-                    value="renewables_electricity",   # default
-                    inputStyle={"marginRight": "6px"},
-                    labelStyle={
-                        "display": "block",
-                        "fontSize": "13px",
-                        "color": "#2C2C2A",
-                        "marginBottom": "6px",
-                        "cursor": "pointer",
-                    },
-                ),
-            ]),
-
-            # ── Reset button
             html.Div(
-                html.Button(
-                    "Reset Filters",
-                    id="reset-filters-btn",
-                    n_clicks=0,
-                    style={
-                        "width": "100%",
-                        "padding": "8px",
-                        "fontSize": "13px",
-                        "cursor": "pointer",
-                        "background": "white",
-                        "border": "0.5px solid #D3D1C7",
-                        "borderRadius": "8px",
-                        "color": "#5F5E5A",
-                    }
-                )
+                style=filter_card_style,
+                children=[
+                    html.Label("Year Range", style=label_style),
+
+                    dcc.RangeSlider(
+                        id=Filters.YEAR_SLIDER,
+                        min=min_year,
+                        max=max_year,
+                        step=1,
+                        value=[default_start_year, max_year],
+                        marks=slider_marks,
+                        tooltip={
+                            "placement": "bottom",
+                            "always_visible": False,
+                        },
+                        allowCross=False,
+                        updatemode="mouseup",
+                    ),
+
+                    html.Div(
+                        id="year-slider-output",
+                        children=f"Selected: {default_start_year} – {max_year}",
+                        style={
+                            "fontSize": "13px",
+                            "color": "#777",
+                            "marginTop": "14px",
+                            "fontWeight": "500",
+                        },
+                    ),
+                ],
+            ),
+
+            html.Div(
+                style=filter_card_style,
+                children=[
+                    html.Label("Select Countries", style=label_style),
+
+                    dcc.Dropdown(
+                        id=Filters.COUNTRY_DROPDOWN,
+                        options=[
+                            {"label": country, "value": country}
+                            for country in countries
+                        ],
+                        value=[],
+                        multi=True,
+                        placeholder="All countries (global aggregate)",
+                        style={"fontSize": "13px"},
+                        clearable=True,
+                    ),
+                ],
+            ),
+
+            html.Div(
+                style=filter_card_style,
+                children=[
+                    html.Label("Filter by Continent", style=label_style),
+
+                    dcc.Checklist(
+                        id=Filters.CONTINENT_CHECKLIST,
+                        options=[
+                            {"label": f" {continent}", "value": continent}
+                            for continent in continents
+                        ],
+                        value=continents,
+                        inline=False,
+                        inputStyle={
+                            "marginRight": "8px",
+                        },
+                        labelStyle={
+                            "display": "block",
+                            "fontSize": "14px",
+                            "color": "#2C2C2A",
+                            "marginBottom": "8px",
+                            "cursor": "pointer",
+                        },
+                    ),
+                ],
+            ),
+
+            html.Div(
+                style=filter_card_style,
+                children=[
+                    html.Label("Primary Energy Metric", style=label_style),
+
+                    dcc.RadioItems(
+                        id=Filters.ENERGY_SOURCE_RADIO,
+                        options=energy_sources,
+                        value="primary_energy_consumption",
+                        inputStyle={
+                            "marginRight": "8px",
+                        },
+                        labelStyle={
+                            "display": "block",
+                            "fontSize": "14px",
+                            "color": "#2C2C2A",
+                            "marginBottom": "8px",
+                            "cursor": "pointer",
+                        },
+                    ),
+                ],
+            ),
+
+            html.Div(
+                style={
+                    "textAlign": "center",
+                    "marginTop": "10px",
+                    "marginBottom": "20px",
+                },
+                children=[
+                    html.Button(
+                        "Reset Filters",
+                        id=Filters.RESET_BTN,
+                        n_clicks=0,
+                        style={
+                            "width": "100%",
+                            "padding": "10px",
+                            "fontSize": "14px",
+                            "fontWeight": "600",
+                            "cursor": "pointer",
+                            "background": "#FFFFFF",
+                            "border": "1px solid #D3D1C7",
+                            "borderRadius": "10px",
+                            "color": "#5F5E5A",
+                        },
+                    )
+                ],
             ),
         ],
     )
 
     return layout
-
-
-# ─────────────────────────────────────────────
-# QUICK TEST  (run: python time_filters.py)
-# ─────────────────────────────────────────────
-
-if __name__ == "__main__":
-    import os
-
-    # Resolve data path relative to this file
-    base = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(base, "data", "cleaned_data.csv")
-
-    print("Testing function_line() ...")
-    fig1 = function_line(filepath=data_path)
-    print("  Traces:", [t.name for t in fig1.data])
-    print("  OK ✓")
-
-    print("Testing function_area() ...")
-    fig2 = function_area(filepath=data_path)
-    print("  Traces:", [t.name for t in fig2.data])
-    print("  OK ✓")
-
-    print("Testing create_filters_layout() ...")
-    layout = create_filters_layout(filepath=data_path)
-    print("  Component ID:", layout.id)
-    print("  OK ✓")
-
-    print("\nAll tests passed!")
