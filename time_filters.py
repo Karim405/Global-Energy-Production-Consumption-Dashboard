@@ -16,9 +16,12 @@ except ImportError:
         COUNTRY_DROPDOWN = "country-dropdown"
         CONTINENT_CHECKLIST = "continent-checklist"
         YEAR_SLIDER = "year-slider"
-        ENERGY_SOURCE_RADIO = "energy-source-radio"
         RESET_BTN = "reset-filters-btn"
 
+
+# ==================================================
+# DATA HELPERS
+# ==================================================
 
 def _clean_column_names(df):
     df = df.copy()
@@ -194,6 +197,10 @@ def _get_individual_countries(df):
     return countries
 
 
+# ==================================================
+# COLOR PALETTE
+# ==================================================
+
 COLORS = {
     "renewables": "#1D9E75",
     "solar": "#EF9F27",
@@ -227,6 +234,10 @@ LAYOUT_DEFAULTS = dict(
     margin=dict(l=60, r=30, t=70, b=60),
 )
 
+
+# ==================================================
+# LINE CHART
+# ==================================================
 
 def function_line(filepath="data/cleaned_data.csv", year_range=None, selected_countries=None):
     df = _load_data(filepath)
@@ -357,6 +368,10 @@ def function_line(filepath="data/cleaned_data.csv", year_range=None, selected_co
 
     return fig
 
+
+# ==================================================
+# AREA CHART
+# ==================================================
 
 def function_area(filepath="data/cleaned_data.csv", year_range=None, selected_countries=None):
     df = _load_data(filepath)
@@ -498,6 +513,10 @@ def function_area(filepath="data/cleaned_data.csv", year_range=None, selected_co
     return fig
 
 
+# ==================================================
+# FILTERS LAYOUT
+# ==================================================
+
 def create_filters_layout(filepath="data/cleaned_data.csv"):
     df = _load_data(filepath)
 
@@ -519,18 +538,6 @@ def create_filters_layout(filepath="data/cleaned_data.csv"):
         "North America",
         "South America",
         "Oceania",
-    ]
-
-    energy_sources = [
-        {"label": "🌿 Renewables", "value": "renewables_electricity"},
-        {"label": "☀️ Solar", "value": "solar_electricity"},
-        {"label": "💨 Wind", "value": "wind_electricity"},
-        {"label": "💧 Hydro", "value": "hydro_electricity"},
-        {"label": "☢️ Nuclear", "value": "nuclear_electricity"},
-        {"label": "🪨 Coal", "value": "coal_production"},
-        {"label": "🔥 Gas", "value": "gas_production"},
-        {"label": "🛢️ Oil", "value": "oil_production"},
-        {"label": "⚡ Total Consumption", "value": "primary_energy_consumption"},
     ]
 
     slider_marks = {
@@ -664,29 +671,6 @@ def create_filters_layout(filepath="data/cleaned_data.csv"):
                         ],
                         value=continents,
                         inline=False,
-                        inputStyle={
-                            "marginRight": "8px",
-                        },
-                        labelStyle={
-                            "display": "block",
-                            "fontSize": "14px",
-                            "color": "#2C2C2A",
-                            "marginBottom": "8px",
-                            "cursor": "pointer",
-                        },
-                    ),
-                ],
-            ),
-
-            html.Div(
-                style=filter_card_style,
-                children=[
-                    html.Label("Primary Energy Metric", style=label_style),
-
-                    dcc.RadioItems(
-                        id=Filters.ENERGY_SOURCE_RADIO,
-                        options=energy_sources,
-                        value="primary_energy_consumption",
                         inputStyle={
                             "marginRight": "8px",
                         },

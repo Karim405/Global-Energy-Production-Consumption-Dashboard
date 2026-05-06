@@ -43,7 +43,6 @@ DATA_FILE = os.path.join(BASE_DIR, DATA_PATH)
 
 df_global = pd.read_csv(DATA_FILE)
 
-# Clean column names
 df_global.columns = (
     df_global.columns
     .astype(str)
@@ -54,7 +53,6 @@ df_global.columns = (
     .str.replace("__", "_", regex=False)
 )
 
-# Fix country column if needed
 if "country" not in df_global.columns:
     for possible_col in ["entity", "location", "name", "country_name"]:
         if possible_col in df_global.columns:
@@ -64,7 +62,6 @@ if "country" not in df_global.columns:
 if "country" not in df_global.columns:
     raise KeyError("No country column found in dataset.")
 
-# Robust year extraction
 if "year" not in df_global.columns:
     raise KeyError("No year column found in dataset.")
 
@@ -81,7 +78,6 @@ df_global["year"] = df_global["year"].astype(int)
 # ==================================================
 
 CONTINENT_MAP_SIMPLE = {
-    # Africa
     "Egypt": "Africa",
     "Nigeria": "Africa",
     "South Africa": "Africa",
@@ -89,7 +85,6 @@ CONTINENT_MAP_SIMPLE = {
     "Morocco": "Africa",
     "Kenya": "Africa",
 
-    # Asia
     "China": "Asia",
     "India": "Asia",
     "Japan": "Asia",
@@ -97,7 +92,6 @@ CONTINENT_MAP_SIMPLE = {
     "Indonesia": "Asia",
     "South Korea": "Asia",
 
-    # Europe
     "Germany": "Europe",
     "France": "Europe",
     "United Kingdom": "Europe",
@@ -105,17 +99,14 @@ CONTINENT_MAP_SIMPLE = {
     "Spain": "Europe",
     "Netherlands": "Europe",
 
-    # North America
     "United States": "North America",
     "Canada": "North America",
     "Mexico": "North America",
 
-    # South America
     "Brazil": "South America",
     "Argentina": "South America",
     "Chile": "South America",
 
-    # Oceania
     "Australia": "Oceania",
     "New Zealand": "Oceania",
 }
@@ -436,7 +427,7 @@ page_comparison_a = html.Div(
         dbc.Row(
             [
                 card(
-                    "Top 10 Countries by Selected Energy Metric",
+                    "Top 10 Countries by Total Energy Consumption",
                     [
                         dcc.Graph(
                             id=Graphs.CHART1_COLUMN,
@@ -869,12 +860,11 @@ def update_kpis(year_range, countries, continents):
     Input(Filters.YEAR_SLIDER, "value"),
     Input(Filters.COUNTRY_DROPDOWN, "value"),
     Input(Filters.CONTINENT_CHECKLIST, "value"),
-    Input(Filters.ENERGY_SOURCE_RADIO, "value"),
 )
-def update_comparison_a(year_range, countries, continents, selected_metric):
+def update_comparison_a(year_range, countries, continents):
     df = _filtered_df(year_range, countries, continents)
 
-    fig1 = function_chart1(df, metric_col=selected_metric)
+    fig1 = function_chart1(df)
     fig2 = function_chart2(df)
     fig3 = function_chart3(df)
 
@@ -964,7 +954,6 @@ def update_timeseries(year_range, countries, continents):
     Output(Filters.COUNTRY_DROPDOWN, "value"),
     Output(Filters.CONTINENT_CHECKLIST, "value"),
     Output(Filters.YEAR_SLIDER, "value"),
-    Output(Filters.ENERGY_SOURCE_RADIO, "value"),
     Input(Filters.RESET_BTN, "n_clicks"),
     prevent_initial_call=True,
 )
@@ -981,7 +970,7 @@ def reset_filters(n_clicks):
         "Oceania",
     ]
 
-    return [], continents, [min_year, max_year], "primary_energy_consumption"
+    return [], continents, [min_year, max_year]
 
 
 @app.callback(
