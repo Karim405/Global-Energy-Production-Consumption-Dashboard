@@ -10,11 +10,71 @@ and carbon intensity, and track the global energy transition from fossil fuels t
 over decades. The goal is to build a dashboard that visualizes the world's energy landscape
 and the progress toward clean energy.
 
-## Dataset
-> • Name: Our World in Data — Energy Dataset
+# ⚡ Global Energy Production & Consumption Dashboard
 
-> • Source: https://github.com/owid/energydata or https://www.kaggle.com/datasets/pralabhpoudel/world-energyconsumption
+An interactive, multi-page Plotly Dash dashboard covering all chart types from the Data Visualization course (Week 1–9).
 
-> • File: World Energy Consumption.csv
+## 📁 Project Structure
 
-> • Size: ~16,000 rows | 120+ columns
+```
+EnergyDashboard/
+├── app.py                  # Main Dash application (entry point)
+├── callbacks.py            # Placeholder (callbacks are in app.py)
+├── comparison_A.py         # Person 1 — Comparison charts A (Column, Bar, Stacked)
+├── comparison_B_kpi.py     # Person 2 — Comparison charts B + KPI logic
+├── relation_distribution.py # Person 3 — Scatter, Bubble, Histogram, Box, Violin
+├── time_filters.py         # Person 4 — Line, Area charts + Filters layout
+├── shared_ids.py           # Shared component IDs for the team
+├── requirements.txt        # Python dependencies
+├── data/
+│   └── cleaned_data.csv    # ← PUT YOUR DATA FILE HERE
+└── README.md
+```
+
+## 🚀 How to Run
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Place your data file:**
+   Put `cleaned_data.csv` inside the `data/` folder.
+
+3. **Run the dashboard:**
+   ```bash
+   python app.py
+   ```
+
+4. **Open in browser:**
+   Navigate to `http://127.0.0.1:8050/`
+
+## 📊 Dashboard Pages
+
+| Page | Charts |
+|------|--------|
+| **Overview & KPIs** | 4 KPI cards + Global Trend Line + Continent Bar |
+| **Comparison A** | Column Chart, Bar Chart, Stacked Bar Chart |
+| **Comparison B** | Stacked Bar, Clustered Column, Clustered Bar |
+| **Relationships** | Scatter Chart, Bubble Chart |
+| **Distributions** | Histogram, Box Chart, Violin Chart |
+| **Time Series** | Line Chart, Area Chart |
+
+## 🎛️ Interactive Filters
+
+All charts respond to the filter panel on the right side:
+- **Year Range Slider** — filter data by year range
+- **Country Dropdown** — focus on specific countries
+- **Continent Checklist** — include/exclude continents
+- **Energy Source Radio** — select primary energy metric
+- **Reset Button** — reset all filters to default
+
+## 👥 Team Roles
+
+| Person | Responsibility | File |
+|--------|---------------|------|
+| Ahmed Waleed| Comparison Charts A | `comparison_A.py` |
+| Hassan Mohamed| Comparison Charts B + KPIs | `comparison_B_kpi.py` |
+| Omar Adel| Relationship & Distribution | `relation_distribution.py` |
+| Omar Ragab| Time Series + Filters | `time_filters.py` |
+| Karim Hamada | App layout + Callbacks | `app.py` |
